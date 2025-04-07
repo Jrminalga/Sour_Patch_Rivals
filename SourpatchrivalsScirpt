@@ -1,0 +1,693 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Sour Patch Rivals",
+    LoadingTitle = "Sour Patch Rivals",
+    LoadingSubtitle = "by Jrminalga",
+    Theme = "Default",
+
+    DisableRayfieldPrompts = true,
+    ConfigurationSaving = {
+       Enabled = true,
+       FolderName = nil,
+       FileName = "Big Hub"
+    },
+})
+
+local MainTab = Window:CreateTab("Main", 4483362458)
+local VisualsTab = Window:CreateTab("Visuals", 4483362458)
+local ThemesTab = Window:CreateTab("Themes", 4483362458)
+
+-- Triggerbot Variables
+local triggerbotEnabled = false
+local triggerbotConnection = nil
+
+-- Triggerbot Function (enemies only)
+local function setupTriggerbot()
+    if triggerbotConnection then
+        triggerbotConnection:Disconnect()
+        triggerbotConnection = nil
+    end
+    
+    if not triggerbotEnabled then return end
+    
+    local player = game:GetService("Players").LocalPlayer
+    local mouse = player:GetMouse()
+    
+    triggerbotConnection = game:GetService("RunService").RenderStepped:Connect(function()
+        if mouse.Target and mouse.Target.Parent then
+            local targetPlayer = game:GetService("Players"):GetPlayerFromCharacter(mouse.Target.Parent)
+            if targetPlayer and targetPlayer ~= player and IsEnemy(targetPlayer) then
+                if mouse.Target.Parent:FindFirstChild("Humanoid") then
+                    mouse1press()
+                    wait()
+                    mouse1release()
+                end
+            end
+        end
+    end)
+end
+
+-- Triggerbot Toggle
+local TriggerbotToggle = MainTab:CreateToggle({
+    Name = "TriggerBot (Enemies Only)",
+    CurrentValue = false,
+    Flag = "TriggerbotToggle",
+    Callback = function(Value)
+        triggerbotEnabled = Value
+        setupTriggerbot()
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Triggerbot Enabled",
+                Content = "Automatically shooting at enemies",
+                Duration = 2,
+            })
+        else
+            Rayfield:Notify({
+                Title = "Triggerbot Disabled",
+                Content = "No longer auto-shooting",
+                Duration = 2,
+            })
+        end
+    end,
+})
+
+-- ESP Variables
+local espEnabled = false
+local espStorage = nil
+local espConnections = {}
+local nameTagsEnabled = true
+local healthBarsEnabled = true
+local showHPNumbers = true
+local currentFillColor = Color3.fromRGB(175, 25, 255)
+local currentOutlineColor = Color3.fromRGB(255, 255, 255)
+local rainbowESPEnabled = false
+local rainbowSpeed = 1
+local manualColorMode = true
+local roundCheckConnection = nil
+
+-- Rainbow color generator
+local function updateRainbowColors()
+    if not rainbowESPEnabled or not espEnabled or manualColorMode then return end
+    
+    local hue = tick() * rainbowSpeed % 1
+    currentFillColor = Color3.fromHSV(hue, 1, 1)
+    
+    if espStorage then
+        for _, highlight in ipairs(espStorage:GetChildren()) do
+            if highlight:IsA("Highlight") then
+                highlight.FillColor = currentFillColor
+                highlight.OutlineColor = currentOutlineColor
+                
+                -- Update nametag text colors
+                local nametag = highlight:FindFirstChild("Nametag")
+                if nametag then
+                    for _, label in ipairs(nametag:GetChildren()) do
+                        if label:IsA("TextLabel") then
+                            label.TextColor3 = currentOutlineColor
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Create rainbow loop
+game:GetService("RunService").Heartbeat:Connect(updateRainbowColors)
+
+-- Function to update all ESP elements
+local function updateAllESP()
+    if not espStorage then return end
+    
+    for _, highlight in ipairs(espStorage:GetChildren()) do
+        if highlight:IsA("Highlight") then
+            highlight.FillColor = currentFillColor
+            highlight.OutlineColor = currentOutlineColor
+            
+            -- Update nametag visibility
+            local nametag = highlight:FindFirstChild("Nametag")
+            if nametag then
+                nametag.Enabled = nameTagsEnabled
+                
+                -- Update text colors
+                for _, label in ipairs(nametag:GetChildren()) do
+                    if label:IsA("TextLabel") then
+                        label.TextColor3 = currentOutlineColor
+                    end
+                end
+            end
+            
+            -- Update health bar visibility
+            local healthBarContainer = highlight:FindFirstChild("HealthBarContainer")
+            if healthBarContainer then
+                healthBarContainer.Enabled = healthBarsEnabled
+                
+                -- Update HP number visibility
+                local healthText = healthBarContainer:FindFirstChild("HealthText")
+                if healthText then
+                    healthText.Visible = showHPNumbers
+                end
+            end
+        end
+    end
+end
+
+-- Function to check if a player is an enemy
+local function IsEnemy(player)
+    local localPlayer = game:GetService("Players").LocalPlayer
+    if not localPlayer.Team then return true end
+    if player.Team == localPlayer.Team or not player.Team then
+        return false
+    end
+    return true
+end
+
+-- Function to clear existing ESP
+local function ClearESP()
+    if espStorage then
+        espStorage:Destroy()
+        espStorage = nil
+    end
+    
+    for plr, connection in pairs(espConnections) do
+        if connection then
+            connection:Disconnect()
+        end
+    end
+    espConnections = {}
+    
+    if roundCheckConnection then
+        roundCheckConnection:Disconnect()
+        roundCheckConnection = nil
+    end
+end
+
+-- Function to create left/right rounded corners only
+local function createSideRoundedCorners(parent)
+    -- Create main frame that will show the rounded sides
+    local roundedFrame = Instance.new("Frame")
+    roundedFrame.Name = "RoundedFrame"
+    roundedFrame.Size = UDim2.new(1, 0, 1, 0)
+    roundedFrame.BackgroundColor3 = parent.BackgroundColor3
+    roundedFrame.BorderSizePixel = 0
+    roundedFrame.ClipsDescendants = true
+    roundedFrame.Parent = parent
+    
+    -- Create the actual rounded corners
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0.5, 0)
+    corner.Parent = roundedFrame
+    
+    -- Create mask to hide top/bottom rounded parts
+    local mask = Instance.new("Frame")
+    mask.Name = "SideRoundMask"
+    mask.Size = UDim2.new(1, 0, 0.9, 0)
+    mask.Position = UDim2.new(0, 0, 0.05, 0)
+    mask.BackgroundColor3 = parent.BackgroundColor3
+    mask.BorderSizePixel = 0
+    mask.Parent = roundedFrame
+    
+    return roundedFrame
+end
+
+-- Function to create ESP for enemies only
+local function CreateESP()
+    ClearESP()
+    
+    local CoreGui = game:GetService("CoreGui")
+    local Players = game:GetService("Players")
+    local localPlayer = Players.LocalPlayer
+    
+    espStorage = Instance.new("Folder")
+    espStorage.Parent = CoreGui
+    espStorage.Name = "Highlight_Storage"
+    
+    local function createHealthBar(parent)
+        local container = Instance.new("BillboardGui")
+        container.Name = "HealthBarContainer"
+        container.Size = UDim2.new(3, 0, 0.4, 0) -- Good visible size
+        container.StudsOffset = Vector3.new(0, 2.5, 0)
+        container.AlwaysOnTop = true
+        container.Enabled = healthBarsEnabled
+        container.Parent = parent
+        
+        -- Create health bar background
+        local healthBarBG = Instance.new("Frame")
+        healthBarBG.Name = "HealthBarBG"
+        healthBarBG.Size = UDim2.new(1, 0, 1, 0)
+        healthBarBG.Position = UDim2.new(0, 0, 0, 0)
+        healthBarBG.BackgroundColor3 = Color3.new(0.2, 0.2, 0.2)
+        healthBarBG.BorderSizePixel = 0
+        healthBarBG.Parent = container
+        
+        -- Create rounded frame for left/right edges
+        local roundedFrame = createSideRoundedCorners(healthBarBG)
+        
+        -- Create actual health bar (inside rounded frame)
+        local healthBar = Instance.new("Frame")
+        healthBar.Name = "HealthBar"
+        healthBar.Size = UDim2.new(1, 0, 1, 0)
+        healthBar.AnchorPoint = Vector2.new(0, 0.5)
+        healthBar.Position = UDim2.new(0, 0, 0.5, 0)
+        healthBar.BackgroundColor3 = Color3.new(0, 1, 0)
+        healthBar.BorderSizePixel = 0
+        healthBar.Parent = roundedFrame
+        
+        -- Create health text (centered)
+        local healthText = Instance.new("TextLabel")
+        healthText.Name = "HealthText"
+        healthText.Size = UDim2.new(1, 0, 1, 0)
+        healthText.AnchorPoint = Vector2.new(0.5, 0.5)
+        healthText.Position = UDim2.new(0.5, 0, 0.5, 0)
+        healthText.BackgroundTransparency = 1
+        healthText.TextColor3 = currentOutlineColor
+        healthText.TextStrokeTransparency = 0.5
+        healthText.TextStrokeColor3 = Color3.new(0, 0, 0)
+        healthText.Font = Enum.Font.GothamSemibold
+        healthText.TextSize = 12
+        healthText.Visible = showHPNumbers
+        healthText.Parent = container
+        
+        return container
+    end
+    
+    local function createNameTag(parent)
+        local nametag = Instance.new("BillboardGui")
+        nametag.Name = "Nametag"
+        nametag.Size = UDim2.new(0, 100, 0, 40)
+        nametag.StudsOffset = Vector3.new(0, 3.5, 0)
+        nametag.AlwaysOnTop = true
+        nametag.Enabled = nameTagsEnabled
+        nametag.Parent = parent
+        
+        local nameLabel = Instance.new("TextLabel")
+        nameLabel.Name = "NameLabel"
+        nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        nameLabel.Position = UDim2.new(0, 0, 0, 0)
+        nameLabel.BackgroundTransparency = 1
+        nameLabel.Text = ""
+        nameLabel.TextColor3 = currentOutlineColor
+        nameLabel.TextStrokeTransparency = 0.5
+        nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        nameLabel.Font = Enum.Font.GothamBold
+        nameLabel.TextSize = 14
+        nameLabel.Parent = nametag
+        
+        local distanceLabel = Instance.new("TextLabel")
+        distanceLabel.Name = "DistanceLabel"
+        distanceLabel.Size = UDim2.new(1, 0, 0.5, 0)
+        distanceLabel.Position = UDim2.new(0, 0, 0.5, 0)
+        distanceLabel.BackgroundTransparency = 1
+        distanceLabel.TextColor3 = currentOutlineColor
+        distanceLabel.TextStrokeTransparency = 0.5
+        distanceLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+        distanceLabel.Font = Enum.Font.GothamSemibold
+        distanceLabel.TextSize = 12
+        distanceLabel.Parent = nametag
+        
+        return nametag
+    end
+    
+    local function Highlight(player)
+        if not IsEnemy(player) then return end
+        
+        local Highlight = Instance.new("Highlight")
+        Highlight.Name = player.Name
+        Highlight.FillColor = currentFillColor
+        Highlight.DepthMode = "AlwaysOnTop"
+        Highlight.FillTransparency = 0.5
+        Highlight.OutlineColor = currentOutlineColor
+        Highlight.OutlineTransparency = 0
+        Highlight.Parent = espStorage
+        
+        -- Create separate health bar container (only for enemies)
+        local healthBarContainer = createHealthBar(Highlight)
+        
+        -- Create separate nametag
+        local nametag = createNameTag(Highlight)
+        
+        local function updateCharacter(character)
+            if not character or not character.Parent then return end
+            
+            Highlight.Adornee = character
+            local head = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+            
+            if head then
+                -- Reattach both nametag and health bar to new character
+                nametag.Adornee = head
+                healthBarContainer.Adornee = head
+                
+                -- Update name label
+                local nameLabel = nametag:FindFirstChild("NameLabel")
+                if nameLabel then
+                    nameLabel.Text = player.Name
+                end
+            end
+            
+            -- Update health and distance
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                local function updateHealth()
+                    local healthPercent = humanoid.Health / humanoid.MaxHealth
+                    local healthBar = healthBarContainer:FindFirstChild("HealthBarBG"):FindFirstChild("RoundedFrame"):FindFirstChild("HealthBar")
+                    local healthText = healthBarContainer:FindFirstChild("HealthText")
+                    
+                    if healthBar then
+                        healthBar.Size = UDim2.new(healthPercent, 0, 1, 0)
+                        
+                        if healthText then
+                            healthText.Text = string.format("%d/%d", math.floor(humanoid.Health), math.floor(humanoid.MaxHealth))
+                        end
+                        
+                        -- Change color based on health
+                        if healthPercent < 0.3 then
+                            healthBar.BackgroundColor3 = Color3.new(1, 0, 0)
+                        elseif healthPercent < 0.6 then
+                            healthBar.BackgroundColor3 = Color3.new(1, 1, 0)
+                        else
+                            healthBar.BackgroundColor3 = Color3.new(0, 1, 0)
+                        end
+                    end
+                end
+                
+                humanoid.HealthChanged:Connect(updateHealth)
+                updateHealth()
+                
+                -- Update distance
+                if localPlayer.Character then
+                    local root = character:FindFirstChild("HumanoidRootPart")
+                    local localRoot = localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if root and localRoot then
+                        local function updateDistance()
+                            local distanceLabel = nametag:FindFirstChild("DistanceLabel")
+                            if distanceLabel then
+                                distanceLabel.Text = string.format("%.1f studs", (root.Position - localRoot.Position).Magnitude)
+                            end
+                        end
+                        
+                        game:GetService("RunService").Heartbeat:Connect(updateDistance)
+                        updateDistance()
+                    end
+                end
+            end
+        end
+        
+        local character = player.Character
+        if character then
+            updateCharacter(character)
+        end
+    
+        espConnections[player] = player.CharacterAdded:Connect(function(newCharacter)
+            if IsEnemy(player) then
+                -- Wait for character to fully load
+                repeat wait() until newCharacter:FindFirstChild("HumanoidRootPart") or newCharacter:FindFirstChild("Head")
+                updateCharacter(newCharacter)
+            else
+                Highlight:Destroy()
+            end
+        end)
+    end
+    
+    -- Team change handling
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= localPlayer then
+            if player:FindFirstChild("Team") then
+                player:GetPropertyChangedSignal("Team"):Connect(function()
+                    if not espEnabled then return end
+                    if espStorage and espStorage:FindFirstChild(player.Name) then
+                        if not IsEnemy(player) then
+                            espStorage[player.Name]:Destroy()
+                        end
+                    else
+                        if IsEnemy(player) then
+                            Highlight(player)
+                        end
+                    end
+                end)
+            end
+            Highlight(player)
+        end
+    end
+    
+    -- New round persistence system
+    roundCheckConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        if not espEnabled then return end
+        
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= localPlayer and IsEnemy(player) then
+                if not espStorage:FindFirstChild(player.Name) then
+                    -- Player doesn't have ESP, probably new round
+                    Highlight(player)
+                elseif player.Character and not espStorage[player.Name].Adornee then
+                    -- Player has ESP but it's not attached to their character
+                    Highlight(player)
+                end
+            end
+        end
+    end)
+    
+    Players.PlayerAdded:Connect(function(player)
+        if player ~= localPlayer then
+            if player:FindFirstChild("Team") then
+                player:GetPropertyChangedSignal("Team"):Connect(function()
+                    if not espEnabled then return end
+                    if espStorage and espStorage:FindFirstChild(player.Name) then
+                        if not IsEnemy(player) then
+                            espStorage[player.Name]:Destroy()
+                        end
+                    else
+                        if IsEnemy(player) then
+                            Highlight(player)
+                        end
+                    end
+                end)
+            end
+            Highlight(player)
+        end
+    end)
+    
+    Players.PlayerRemoving:Connect(function(player)
+        if espStorage and espStorage:FindFirstChild(player.Name) then
+            espStorage[player.Name]:Destroy()
+        end
+        if espConnections[player] then
+            espConnections[player]:Disconnect()
+            espConnections[player] = nil
+        end
+    end)
+end
+
+-- Initialize ESP only if enabled
+if espEnabled then
+    CreateESP()
+end
+
+-- Nametag Toggle
+local NametagToggle = VisualsTab:CreateToggle({
+    Name = "Show Nametags",
+    CurrentValue = nameTagsEnabled,
+    Flag = "NametagToggle",
+    Callback = function(Value)
+        nameTagsEnabled = Value
+        if espStorage then
+            for _, highlight in ipairs(espStorage:GetChildren()) do
+                if highlight:IsA("Highlight") then
+                    local nametag = highlight:FindFirstChild("Nametag")
+                    if nametag then
+                        nametag.Enabled = Value
+                    end
+                end
+            end
+        end
+    end,
+})
+
+-- Health Bar Toggle
+local HealthBarToggle = VisualsTab:CreateToggle({
+    Name = "Show Health Bars",
+    CurrentValue = healthBarsEnabled,
+    Flag = "HealthBarToggle",
+    Callback = function(Value)
+        healthBarsEnabled = Value
+        if espStorage then
+            for _, highlight in ipairs(espStorage:GetChildren()) do
+                if highlight:IsA("Highlight") then
+                    local healthBarContainer = highlight:FindFirstChild("HealthBarContainer")
+                    if healthBarContainer then
+                        healthBarContainer.Enabled = Value
+                    end
+                end
+            end
+        end
+    end,
+})
+
+-- HP Numbers Toggle
+local HPNumberToggle = VisualsTab:CreateToggle({
+    Name = "Show HP Numbers",
+    CurrentValue = showHPNumbers,
+    Flag = "HPNumberToggle",
+    Callback = function(Value)
+        showHPNumbers = Value
+        if espStorage then
+            for _, highlight in ipairs(espStorage:GetChildren()) do
+                if highlight:IsA("Highlight") then
+                    local healthBarContainer = highlight:FindFirstChild("HealthBarContainer")
+                    if healthBarContainer then
+                        local healthText = healthBarContainer:FindFirstChild("HealthText")
+                        if healthText then
+                            healthText.Visible = Value
+                        end
+                    end
+                end
+            end
+        end
+    end,
+})
+
+-- ESP Toggle
+local ESPToggle = VisualsTab:CreateToggle({
+    Name = "ESP (Enemies Only)",
+    CurrentValue = espEnabled,
+    Flag = "ESPToggle",
+    Callback = function(Value)
+        espEnabled = Value
+        if Value then
+            CreateESP()
+            Rayfield:Notify({
+                Title = "ESP Active",
+                Content = "ESP will persist between rounds",
+                Duration = 2,
+            })
+        else
+            ClearESP()
+            RainbowToggle:Set(false)
+        end
+    end,
+})
+
+-- Rainbow ESP Toggle
+local RainbowToggle = VisualsTab:CreateToggle({
+    Name = "Rainbow ESP",
+    CurrentValue = false,
+    Flag = "RainbowToggle",
+    Callback = function(Value)
+        if not espEnabled then
+            RainbowToggle:Set(false)
+            Rayfield:Notify({
+                Title = "ESP Required",
+                Content = "Please enable ESP first!",
+                Duration = 3,
+            })
+            return
+        end
+        
+        rainbowESPEnabled = Value
+        manualColorMode = not Value
+        
+        if Value then
+            Rayfield:Notify({
+                Title = "Rainbow Mode",
+                Content = string.format("Rainbow colors activated!\nSpeed: %.1fx", rainbowSpeed),
+                Duration = 2,
+            })
+        else
+            updateAllESP()
+        end
+    end,
+})
+
+-- Rainbow Speed Slider
+local RainbowSpeedSlider = VisualsTab:CreateSlider({
+    Name = "Rainbow Speed",
+    Range = {0.1, 5},
+    Increment = 0.1,
+    Suffix = "x",
+    CurrentValue = 1,
+    Flag = "RainbowSpeed",
+    Callback = function(Value)
+        rainbowSpeed = Value
+        if rainbowESPEnabled then
+            Rayfield:Notify({
+                Title = "Speed Adjusted",
+                Content = string.format("Rainbow speed set to %.1fx", Value),
+                Duration = 1.5,
+            })
+        end
+    end,
+})
+
+-- Color Picker for ESP Fill Color
+local FillColorPicker = VisualsTab:CreateColorPicker({
+    Name = "ESP Fill Color",
+    Color = currentFillColor,
+    Flag = "ESP_Fill_Color",
+    Callback = function(Color)
+        if rainbowESPEnabled then
+            RainbowToggle:Set(false)
+            manualColorMode = true
+        end
+        currentFillColor = Color
+        updateAllESP()
+    end
+})
+
+-- Color Picker for ESP Outline Color
+local OutlineColorPicker = VisualsTab:CreateColorPicker({
+    Name = "ESP Outline Color",
+    Color = currentOutlineColor,
+    Flag = "ESP_Outline_Color",
+    Callback = function(Color)
+        currentOutlineColor = Color
+        updateAllESP()
+    end
+})
+
+-- Theme Dropdown
+local ThemeDropdown = ThemesTab:CreateDropdown({
+   Name = "Select Theme",
+   Options = {
+       "Default", 
+       "Amber Glow", 
+       "Amethyst", 
+       "Bloom", 
+       "Dark Blue", 
+       "Green", 
+       "Light", 
+       "Ocean", 
+       "Serenity"
+   },
+   CurrentOption = {"Default"},
+   MultipleOptions = false,
+   Flag = "ThemeSelector",
+   Callback = function(Selected)
+       local themeMap = {
+           ["Default"] = "Default",
+           ["Amber Glow"] = "AmberGlow",
+           ["Amethyst"] = "Amethyst",
+           ["Bloom"] = "Bloom",
+           ["Dark Blue"] = "DarkBlue",
+           ["Green"] = "Green",
+           ["Light"] = "Light",
+           ["Ocean"] = "Ocean",
+           ["Serenity"] = "Serenity"
+       }
+       
+       if themeMap[Selected[1]] then
+           Window.ModifyTheme(themeMap[Selected[1]])
+       end
+   end,
+})
+
+-- Cleanup
+game:GetService("Players").LocalPlayer.CharacterRemoving:Connect(function()
+    if triggerbotConnection then
+        triggerbotConnection:Disconnect()
+    end
+    if not espEnabled then
+        ClearESP()
+    end
+end)
