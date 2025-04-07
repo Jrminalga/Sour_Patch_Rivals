@@ -1,3 +1,6 @@
+local player = game:GetService("Players").LocalPlayer
+local mouse = player:GetMouse()
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
@@ -21,6 +24,16 @@ local ThemesTab = Window:CreateTab("Themes", 4483362458)
 -- Triggerbot Variables
 local triggerbotEnabled = false
 local triggerbotConnection = nil
+
+-- Function to check if a player is an enemy
+local function IsEnemy(player)
+    local localPlayer = game:GetService("Players").LocalPlayer
+    if not localPlayer.Team then return true end
+    if player.Team == localPlayer.Team or not player.Team then
+        return false
+    end
+    return true
+end
 
 -- Triggerbot Function (enemies only)
 local function setupTriggerbot()
@@ -152,16 +165,6 @@ local function updateAllESP()
             end
         end
     end
-end
-
--- Function to check if a player is an enemy
-local function IsEnemy(player)
-    local localPlayer = game:GetService("Players").LocalPlayer
-    if not localPlayer.Team then return true end
-    if player.Team == localPlayer.Team or not player.Team then
-        return false
-    end
-    return true
 end
 
 -- Function to clear existing ESP
